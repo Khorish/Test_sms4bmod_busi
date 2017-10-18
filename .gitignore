@@ -1,0 +1,30 @@
+/.idea/*
+/.idea/
+/.git/*
+/dev/*
+/.htaccess
+/*.htaccess
+/.htaccess*
+/web.config
+/*web.config
+/*.log
+/*.sql
+# исключаем из репозитория текстовые файлы, но оставляем robots.txt
+!/robots.txt
+/sitemap*.xml
+/*.dt
+/*.tar.gz
+/*.gz
+/*.tar
+/*.bak
+/*.old
+
+# используется папка /local
+/bitrix/*
+#  служебные папки
+/pma
+/upload
+/verstka
+
+#Папка удаленного репозитория которую создал git
+/Test1
