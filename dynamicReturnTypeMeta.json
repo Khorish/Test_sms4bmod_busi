@@ -1,0 +1,9 @@
+{
+  "methodCalls": [
+    {
+      "class": "\\Rarus\\Sms4b\\Dic\\Dic",
+      "method": "get",
+      "position": 0
+    }
+  ]
+}

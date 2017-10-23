@@ -1,30 +1,19 @@
 /.idea/*
-/.idea/
-/.git/*
 /dev/*
-/.htaccess
-/*.htaccess
-/.htaccess*
-/web.config
-/*web.config
-/*.log
-/*.sql
-# исключаем из репозитория текстовые файлы, но оставляем robots.txt
-!/robots.txt
-/sitemap*.xml
-/*.dt
-/*.tar.gz
-/*.gz
-/*.tar
-/*.bak
-/*.old
+
+#Настройки плагинов
+dynamicReturnTypeMeta.json
+
+# Логи отслеживаем, но не коммитим
+#/*.log
 
 # используется папка /local
+# По идее битрикс нужно отслеживать и комитить, но ели случейно будет изменено ядро и запушено... не отслеживаем
 /bitrix/*
-#  служебные папки
-/pma
-/upload
-/verstka
+#Модули и компоненты по умолчанию ставятся в папку битрикс, и не факт что они норм настроены для работы из папки локал
+!/bitrix/components/rarus.sms4b
+!/bitrix/modules/rarus.sms4b
 
-#Папка удаленного репозитория которую создал git
-/Test1
+#  служебные папки
+/upload
+
