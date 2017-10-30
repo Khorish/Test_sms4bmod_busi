@@ -33,6 +33,9 @@ function EditOrderAndSendSMS(Main\Event $event)
     $arFields = array();
     $arFields['SALE_EMAIL'] = \Bitrix\Main\Config\Option::get('main', 'email_from', '');
     $order = $event->getParameter('ENTITY');
+    /**
+     * @var \Bitrix\Sale\Order $order
+     */
     $site = $order->getSiteId();
 
     $userId = $order->getUserId();
@@ -101,21 +104,16 @@ function EditOrderAndSendSMS(Main\Event $event)
         //AddMessage2Log('<br> method_exists GetPhoneOrder? - '.method_exists($SMS4B, 'GetPhoneOrder'));
         //AddMessage2Log('<br> method_exists is_phone? - '.method_exists($SMS4B, 'is_phone'));
         if ($admin !== 'Y') {
-            // сохраняю нижнее подчеркивание для этой переменной,
-            //  чтобы она оставалась такая же как в коде модуля, чтоб легче видеть соответсвия при чтении кода
-            $phone_send_sms = $SMS4B->is_phone($SMS4B->GetPhoneOrder($arFields['ORDER_ID'], $site));
+            $phoneSendSMS = $SMS4B->is_phone($SMS4B->GetPhoneOrder($arFields['ORDER_ID'], $site));
         } else {
-            $phone_send_sms = $SMS4B->GetAdminPhones($site);
-            $text['MESSAGE'] = str_replace('#PHONE_TO#', $phone_send_sms, $text['MESSAGE']);
+            $phoneSendSMS = $SMS4B->GetAdminPhones($site);
+            $text['MESSAGE'] = str_replace('#PHONE_TO#', $phoneSendSMS, $text['MESSAGE']);
         }
 
-        if (empty($phone_send_sms) || !is_array($text)) {
+        if (empty($phoneSendSMS) || !is_array($text)) {
             return false;
         }
 
-        //Здесь ошибка метод Translit не принадлежит объекту - но по факту принадлежит
-        //AddMessage2Log('<br> method_exists Translit? - '.method_exists($SMS4B, 'Translit'));
-        // шторм  ошибся наверно потому что этот метод принадлежит родителю того класса, который создал метод, а не классу-создателю объекта
         $message = $SMS4B->use_translit === 'Y' ? $SMS4B->Translit($text['MESSAGE']) : $text['MESSAGE'];
 
         $startQuitPeriod = DateTime::createFromPhp(new \DateTime(START_QUITE_PERIOD));
@@ -132,22 +130,39 @@ function EditOrderAndSendSMS(Main\Event $event)
             $timeToSend = $endQuitPeriod;
         }
 
-        if (is_array($phone_send_sms)) {
-            foreach ($phone_send_sms as $phone_num) {
+        /*
+         * // адекватно работает если админы передаются массивами
+         * // но не учтено что по  SOAP sms передаются пачками в xml-документе
+
+        if (is_array($phoneSendSMS)) {
+            foreach ($phoneSendSMS as $phoneNum) {
                 //Здесь ошибка - SendSmsSaveGroup не принадлежит объекту $SMS4B  Method 'SendSmsSaveGroup' not found in less... Referenced method is not found in subject class.
                 // но по факту - принадлежит
                 //AddMessage2Log('method_exists? - '.method_exists($SMS4B, 'SendSmsSaveGroup'));
                 // шторм наверно ошибся потому что этот метод принадлежит родителю того класса, который создал метод, а не классу-создателю объекта
-                $SMS4B->SendSmsSaveGroup(array($phone_num => $message), $sender, $timeToSend, null, null, null,
+                $SMS4B->SendSmsSaveGroup(array($phoneNum => $message), $sender, $timeToSend, null, null, null,
                     $arFields['ORDER_ID'], $eventName, 0);
             }
         } else {
-            $SMS4B->SendSmsSaveGroup(array($phone_send_sms => $message), $sender, $timeToSend, null, null, null,
+            $SMS4B->SendSmsSaveGroup(array($phoneSendSMS => $message), $sender, $timeToSend, null, null, null,
                 $arFields['ORDER_ID'], $eventName, 0);
         }
+        */
+
+        if (is_array($phoneSendSMS)) {
+            foreach ($phoneSendSMS as $phoneNum) {
+                $arSendSms[$phoneNum] = $message;
+            }
+        } else {
+            $arSendSms[$phoneSendSMS] = $message;
+        }
+
+        $SMS4B->SendSmsSaveGroup($arSendSms, $sender, $timeToSend, null, null, null,
+            $arFields['ORDER_ID'], $eventName, 0);
 
         return true;
     }
+
 
     SendSmsToUser('SMS4B_', $site, $arFields);
     SendSmsToUser('SMS4B_ADMIN_', $site, $arFields, 'Y');
