@@ -1,17 +1,32 @@
 <?php
 
+/**
+ * Отправка СМС в определенное время. |  телефон, текст, имя отправителя.  Время.
+ */
 class CustomizeSendSMS
 {
     public $startQuitePeriod = START_QUITE_PERIOD;
     public $endQuitePeriod = END_QUITE_PERIOD;
     private $objSMS4B = null;
+
+
     private $templeMessage = 'SMS4B_';
+
+    /**
+     * @var bool
+     */
     private $sendUserAdmin = false;
-    private $userPhone = null;
+
+    private $userPhone = null;  //зачем?
+
     private $eventName = 'SALE_NEW_ORDER';
+
     private $orderId = null;
+
     private $siteId = null;
+
     private $fieldsSMS = array();
+
     private $sender = null;
 
     /**
@@ -20,11 +35,14 @@ class CustomizeSendSMS
      * @param $arFields
      * @param bool $admin
      */
-    public function __construct($siteId, $arFields, $admin = false)
+    public function __construct($siteId, $arFields,  $admin = false)
     {
         $this->siteId = $siteId;
         $this->orderId = $arFields['ORDER_ID'];
         $this->fieldsSMS = $arFields;
+        /**
+         * @var Csms4b $this->objSMS4B
+         */
         $this->objSMS4B = $GLOBALS['SMS4B'];
         if ($admin === true) {
             $this->templeMessage .= 'ADMIN_';
@@ -33,17 +51,27 @@ class CustomizeSendSMS
     }
 
     /**
-     * @return mixed
+     * получение телефона (строка/массив), на который будет идти отправка смс
+     *
+     * @param $objSMS4B
+     * @param $orderId
+     * @param $siteId
+     * @param $userAdmin
+     * @return array|false|null|string
+     * @throws Main\ArgumentException
      */
-    public function phoneTo()
+    public function phoneTo($objSMS4B, $orderId, $siteId, $userAdmin)
     {
-        $notFormatPhone = $this->objSMS4B->GetPhoneOrder($this->orderId, $this->siteId);
-        $this->userPhone = $this->objSMS4B->is_phone($notFormatPhone);
+        /**
+         * @var Csms4b $objSMS4B
+         */
+        $notFormatPhone = $objSMS4B->GetPhoneOrder($orderId, $siteId);
+        $this->userPhone = $objSMS4B->is_phone($notFormatPhone);
 
-        if ($this->sendUserAdmin === true) {
-            $phoneToSend = $this->objSMS4B->GetAdminPhones($this->siteId);
+        if ($userAdmin === true) {
+            $phoneToSend = $objSMS4B->GetAdminPhones($siteId);
         } else {
-            $phoneToSend = $this->userPhone;
+            $phoneToSend[] = $this->userPhone;
         }
 
         return $phoneToSend;
@@ -52,28 +80,38 @@ class CustomizeSendSMS
     /**
      * @return mixed
      */
-    public function getSender()
+    public function getSender($objSMS4B, $siteId)
     {
-        $this->sender = $this->objSMS4B->GetCurrentOption('defsender', $this->siteId);
-        return $this->sender;
+        /**
+         * @var Csms4b $objSMS4B
+         */
+//        $this->sender = $objSMS4B->GetCurrentOption('defsender', $siteId);
+//        return $this->sender;
     }
 
     /**
-     * @param $userNumber
-     * @return mixed
+     * @param $objSMS4B
+     * @param $templName
+     * @param $siteId
+     * @param $arFields
+     * @param $userPhone
+     * @return array
      */
-    public function getTextMessage()
+    public function getTextMessage($objSMS4B, $templName, $siteId, $arFields, $userPhone)
     {
-        $textMessage = $this->objSMS4B->GetEventTemplate($this->templeMessage . $this->eventName, $this->siteId);
+        /**
+         * @var Csms4b $objSMS4B
+         */
+        $textMessage = $objSMS4B->GetEventTemplate($templName, $siteId);
 
-        foreach ($this->fieldsSMS as $k => $value) {
+        foreach ($arFields as $k => $value) {
             $textMessage['MESSAGE'] = str_replace('#' . $k . '#', $value, $textMessage['MESSAGE']);
         }
 
-        $textMessage['MESSAGE'] = str_replace('#PHONE_TO#', $this->userPhone, $textMessage['MESSAGE']);
+        $textMessage['MESSAGE'] = str_replace('#PHONE_TO#', $userPhone, $textMessage['MESSAGE']);
 
-        if ($this->objSMS4B->use_translit === 'Y') {
-            $textMessage['MESSAGE'] = $this->objSMS4B->Translit($textMessage['MESSAGE']);
+        if ($objSMS4B->use_translit === 'Y') {
+            $textMessage['MESSAGE'] = $objSMS4B->Translit($textMessage['MESSAGE']);
         }
         return $textMessage;
     }
@@ -85,17 +123,17 @@ class CustomizeSendSMS
      */
     public function checkQuitTime($startQuitePeriod, $endQuitePeriod)
     {
-        $nowTime = new DateTime();
-        $startQuitPeriod = new DateTime($startQuitePeriod);
-        $endQuitPeriod = new DateTime($endQuitePeriod);
-        $timeToSend = null;
-
-        if (($startQuitPeriod <= $nowTime || $nowTime <= $endQuitPeriod) && ($startQuitPeriod > $endQuitPeriod)) {
-            $timeToSend = $endQuitPeriod->modify('+1 day')->format('Y-m-d H:i:s');
-        } elseif (($startQuitPeriod <= $nowTime && $nowTime <= $endQuitPeriod) && ($startQuitPeriod < $endQuitPeriod)) {
-            $timeToSend = $endQuitPeriod->format('Y-m-d H:i:s');
-        }
-        return $timeToSend;
+//        $nowTime = new DateTime();
+//        $startQuitPeriod = new DateTime($startQuitePeriod);
+//        $endQuitPeriod = new DateTime($endQuitePeriod);
+//        $timeToSend = null;
+//
+//        if (($startQuitPeriod <= $nowTime || $nowTime <= $endQuitPeriod) && ($startQuitPeriod > $endQuitPeriod)) {
+//            $timeToSend = $endQuitPeriod->modify('+1 day')->format('Y-m-d H:i:s');
+//        } elseif (($startQuitPeriod <= $nowTime && $nowTime <= $endQuitPeriod) && ($startQuitPeriod < $endQuitPeriod)) {
+//            $timeToSend = $endQuitPeriod->format('Y-m-d H:i:s');
+//        }
+//        return $timeToSend;
     }
 
     /**
@@ -103,10 +141,9 @@ class CustomizeSendSMS
      */
     public function sendCustomSMS()
     {
-        $phoneSendSMS = $this->phoneTo();
-        $textMessage = $this->getTextMessage();
-
-        $timeSend = $this->checkQuitTime($this->startQuitePeriod, $this->endQuitePeriod);
+        $phoneSendSMS = $this->phoneTo($this->objSMS4B, $this->orderId, $this->siteId, $this->sendUserAdmin);
+        $textMessage = $this->getTextMessage($this->objSMS4B, $this->templeMessage . $this->eventName, $this->siteId, $this->fieldsSMS, $this->userPhone);
+//        $timeSend = $this->checkQuitTime($this->startQuitePeriod, $this->endQuitePeriod);
 
         if (empty($phoneSendSMS) || !is_array($textMessage)) {
             return false;
@@ -117,12 +154,15 @@ class CustomizeSendSMS
             foreach ($phoneSendSMS as $phoneNum) {
                 $arSendSms[$phoneNum] = $textMessage['MESSAGE'];
             }
-        } else {
-            $arSendSms[$phoneSendSMS] = $textMessage['MESSAGE'];
         }
+//        else {
+//            $arSendSms[$phoneSendSMS] = $textMessage['MESSAGE'];
+//        }
 
-        $this->objSMS4B->SendSmsSaveGroup($arSendSms, $this->getSender(), $timeSend, null, null, null, $this->orderId,
-            $this->eventName, 0);
+//        $sender = $this->getSender($this->objSMS4B, $this->siteId);
+
+//        $this->objSMS4B->SendSmsSaveGroup($arSendSms, $sender, $timeSend, null, null, null, $this->orderId, $this->eventName, 0);
+        $this->objSMS4B->SendSmsSaveGroup($arSendSms, $sender, '', null, 'KJ', null, $this->orderId, $this->eventName, 0);
 
         return true;
     }
@@ -191,6 +231,56 @@ function EditOrderAndSendSMS(Main\Event $event)
 
         $SendSmsToAdmin = new CustomizeSendSMS($site, $arFields, true);
         $SendSmsToAdmin->sendCustomSMS();
+
+        $phoneSendSMS = $this->phoneTo($this->objSMS4B, $this->orderId, $this->siteId, $this->sendUserAdmin);
+        $textMessage = $this->getTextMessage($this->objSMS4B, $this->templeMessage . $this->eventName, $this->siteId, $this->fieldsSMS, $this->userPhone);
+//        $timeSend = $this->checkQuitTime($this->startQuitePeriod, $this->endQuitePeriod);
+
+        if (empty($phoneSendSMS) || !is_array($textMessage)) {
+            return false;
+        }
+
+        $arSendSms = array();
+        if (is_array($phoneSendSMS)) {
+            foreach ($phoneSendSMS as $phoneNum) {
+                $arSendSms[$phoneNum] = $textMessage['MESSAGE'];
+            }
+        }
+//        else {
+//            $arSendSms[$phoneSendSMS] = $textMessage['MESSAGE'];
+//        }
+
+//        $sender = $this->getSender($this->objSMS4B, $this->siteId);
+
+//        $this->objSMS4B->SendSmsSaveGroup($arSendSms, $sender, $timeSend, null, null, null, $this->orderId, $this->eventName, 0);
+        $this->objSMS4B->SendSmsSaveGroup($arSendSms, $sender, '', null, 'KJ', null, $this->orderId, $this->eventName, 0);
+
+        return true;
+        $phoneSendSMS = $this->phoneTo($this->objSMS4B, $this->orderId, $this->siteId, $this->sendUserAdmin);
+        $textMessage = $this->getTextMessage($this->objSMS4B, $this->templeMessage . $this->eventName, $this->siteId, $this->fieldsSMS, $this->userPhone);
+//        $timeSend = $this->checkQuitTime($this->startQuitePeriod, $this->endQuitePeriod);
+
+        if (empty($phoneSendSMS) || !is_array($textMessage)) {
+            return false;
+        }
+
+        $arSendSms = array();
+        if (is_array($phoneSendSMS)) {
+            foreach ($phoneSendSMS as $phoneNum) {
+                $arSendSms[$phoneNum] = $textMessage['MESSAGE'];
+            }
+        }
+//        else {
+//            $arSendSms[$phoneSendSMS] = $textMessage['MESSAGE'];
+//        }
+
+//        $sender = $this->getSender($this->objSMS4B, $this->siteId);
+
+//        $this->objSMS4B->SendSmsSaveGroup($arSendSms, $sender, $timeSend, null, null, null, $this->orderId, $this->eventName, 0);
+        $this->objSMS4B->SendSmsSaveGroup($arSendSms, $sender, '', null, 'KJ', null, $this->orderId, $this->eventName, 0);
+
+        return true;
+
 
     } catch (Exception $e) {
         AddMessage2Log('Выброшено исключение: ', $e->getMessage(), "\n");
