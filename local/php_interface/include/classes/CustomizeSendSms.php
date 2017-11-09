@@ -1,6 +1,4 @@
 <?php
-//use Rarus\Sms4b;
-//use Rarus\Sms4b\Sms4bException;
 use Bitrix\Main;
 
 /*
@@ -11,107 +9,86 @@ use Bitrix\Main;
 class CustomizeSendSms
 {
     /**
-     * @var object - объект события переданный битрикс-обработчиком
+     * @var Csms4b $obSms4b - объект Sms4b, уже созданный в системе
      */
-    public $objEvent;
+    public $obSms4b;
     /**
-     * @var object - объект Sms4b, уже созданный в системе
-     */
-    public $objSms4b;
-    /**
-     * @var integer - номер часа, с которого начинается "тихий период" - (0-23)
+     * @var string $startQuitePeriod - номер часа, с которого начинается "тихий период" - (0-23)
      */
     public $startQuitePeriod;
     /**
-     * @var integer - номер часа, на котором кончается "тихий период" - (0-23)
+     * @var string $endQuitePeriod - номер часа, на котором кончается "тихий период" - (0-23)
      */
     public $endQuitePeriod;
 
     /**
      * CustomizeSendSms constructor.
-     * @param $objEvent object - объект события OnSaleOrderSaved (передается битриксом)
-     * @param $objSms4b object - объект модуля sms4b, который уже создан в системе
-     * @param null $startQuitePeriod string - начало периода, в который не отсылать смс
-     * @param null $endQuitePeriod string - конец периода, в который не отсылать смс
+     * @param Csms4b $obSms4b
+     * @param null $startQuitePeriod
+     * @param null $endQuitePeriod
      */
-    public function __construct(Main\Event $objEvent, object $objSms4b, string $startQuitePeriod = null, string $endQuitePeriod = null)
+    public function __construct(Csms4b $obSms4b,  $startQuitePeriod = null,  $endQuitePeriod = null)
     {
-        $this->objEvent = $objEvent;
-
-        /**
-         * @var Csms4b $objThis ->objSms4b
-         */
-        if (null !== $objSms4b) {
-            $this->objSms4b = $objSms4b;
+        if (null !== $obSms4b) {
+            $this->obSms4b = $obSms4b;
         } else {
-            require_once($_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/rarus.sms4b/classes/mysql/sms4b.php');
-            $this->objSms4b = new Csms4b();
+            require_once $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/rarus.sms4b/classes/mysql/sms4b.php';
+            $this->obSms4b = new Csms4b();
         }
 
-        if ($startQuitePeriod !== null) {
+        if ($startQuitePeriod !== null)
+        {
             $this->startQuitePeriod = $startQuitePeriod;
         }
 
-        if ($endQuitePeriod !== null) {
+        if ($endQuitePeriod !== null)
+        {
             $this->endQuitePeriod = $endQuitePeriod;
         }
+
     }
 
     /**
-     * @throws Exception - не подключенный модуль rarus.sms4b
+     * @throws |Exception
      */
     public function checkIncludeModule()
     {
         if (!CModule::IncludeModule('rarus.sms4b'))
         {
-            throw new Exception('модуль rarus.sms4b не подключен');
+            throw new \Exception('модуль rarus.sms4b не подключен');
         }
     }
 
     /**
-     * @param $objEvent object -  объект события OnSaleOrderSaved (передается битриксом)
-     *
-     * @throws Exception - проверка, что заказ новый, а не обновление
+     * @param Csms4b $obSms4b
+     * @param $userPhone
+     * @return false|string
+     * @throws |Exception
      */
-    public function checkNewOrder(object $objEvent)
+    public function validateUserPhone(Csms4b $obSms4b, $userPhone)
     {
-        if (!$objEvent->getParameter('IS_NEW'))
-        {
-            throw new Exception('Это обновление заказа, а не новый заказ');
-        }
-    }
+        $userPhoneFormat = $obSms4b->is_phone($userPhone);
 
-    /**
-     * @param $objSms4b object
-     * @param $userPhone string
-     *
-     * @throws Exception
-     *
-     * @return string
-     */
-    public function checkUserPhone(object $objSms4b, string $userPhone)
-    {
-        $userPhoneFormat = $objSms4b->is_phone($userPhone);
         if ($userPhoneFormat === false) {
-            throw new Exception('Не возможно отправить по такому телефону' . $userPhone);
+            throw new \Exception('Не возможно отправить по такому телефону' . $userPhone);
         }
-        return $userPhone;
+        return $userPhoneFormat;
     }
 
-    /**
-     * -  объект события OnSaleOrderSaved (передается битриксом)
-     * @param $event obj
-     * @param $objSms4b obj - объект модуля sms4b, который уже создан в системе
-     *
-     * @throws Main\ArgumentException
-     *
-     * @return array - поля с данными для отправки - состав заказа, цена, ...
-     */
-    public function getFieldsSms(object $event, object $objSms4b)
-    {
-        $arFields['ORDER_ID'] = $event->getParameter('ENTITY')->getId();
 
-        $arFieldsRes = $objSms4b->GetOrderData(array($arFields['ORDER_ID']));
+    /**
+     * @param Main\Event $obEvent
+     * @param Csms4b $obSms4b
+     * @return array
+     * @throws Main\ArgumentException
+     * @throws Main\LoaderException
+     * @throws Main\ObjectException
+     */
+    public function getFieldsSms(Main\Event $obEvent, Csms4b $obSms4b)
+    {
+       /* $arFields['ORDER_ID'] = $obEvent->getParameter('ENTITY')->getId();
+
+        $arFieldsRes = $obSms4b->GetOrderData(array($arFields['ORDER_ID']));
         $arFields = array_merge($arFields, $arFieldsRes[$arFields['ORDER_ID']]);
 
         $arFields['PRICE'] = CCurrencyLang::CurrencyFormat($arFields['PRICE'], $arFields['CURRENCY']);
@@ -122,46 +99,57 @@ class CustomizeSendSms
         if ($row = $result->fetch()) {
             $arFields['USER_LOGIN'] = $row['NAME'];
         }
-//        метод getLocationPathDisplay - deprecated
-//
-//        но есть, ресурсоемкая альтернатива
-//        $order = $event->getParameter('ENTITY');
-//        $propertyCollection = $order->getPropertyCollection();
-//        $arFields['LOCATION'] = $propertyCollection->getDeliveryLocation()->getViewHtml();
-//
-//        или альтернатива на идентификаторе, не учитывающая возможность передачи символьного кода в Location
-//        $arFields['LOCATION'] = Bitrix\Sale\Location\Admin\LocationHelper::getLocationStringById($arFields['LOCATION']);
-        $arFields['LOCATION'] = Bitrix\Sale\Location\Admin\LocationHelper::getLocationPathDisplay($arFields['LOCATION']);
+
+        $order = $obEvent->getParameter('ENTITY');
+        $propertyCollection = $order->getPropertyCollection();
+        $arFields['LOCATION'] = $propertyCollection->getDeliveryLocation()->getViewHtml();*/
+
+
+        $order = $obEvent->getParameter('ENTITY');
+        // fields from $order
+        $arFields['ORDER_ID'] = $order->getId();
+        $arFields['ORDER_DATE'] = $order->getDateInsert()->format('Y-m-d H:i:s');
+        $arFields['PRICE'] = CCurrencyLang::CurrencyFormat($order->getPrice(), $order->getCurrency());
+        $arItems = $order->getBasket()->getListOfFormatText();
+        foreach ($arItems as $key => $val) {
+            $arFields['ORDER_LIST'] .= $val . ' ';
+        }
+        $userId = $order->getUserId();
+        $result = \Bitrix\Main\UserTable::getList(array(
+            'select' => array('NAME'),
+            'filter' => array('=ID' => $userId)
+        ));
+        if ($row = $result->fetch()) {
+            $arFields['USER_LOGIN'] = $row['NAME'];
+        }
+
+        // fields from $propertyCollection
+        $propertyCollection = $order->getPropertyCollection();
+        $arFields['LOCATION'] = $propertyCollection->getDeliveryLocation()->getViewHtml();
+        $arOrderProperties = array();
+        foreach ($propertyCollection as $propertyItem) {
+            $arOrderProperties[$propertyItem->getField('CODE')] = $propertyItem->getValue();
+        }
+        $arFields['FIO'] = $arOrderProperties['FIO'];
+        $arFields['ADDRESS'] = $arOrderProperties['ADDRESS'];
+        $arFields['ZIP'] = $arOrderProperties['ZIP'];
+
+        $arFields['PHONE_TO'] = $obSms4b->is_phone($obSms4b->GetPhoneOrder($arFields['ORDER_ID'], SITE_ID));
+
+        unset($arOrderProperties, $row);
 
         return $arFields;
     }
 
-    /**
-     * @param $objSms4b object - объект модуля sms4b, который уже создан в системе
-     * @return array - массив номеров админов
-     */
-    public function getAdminNumbers(object $objSms4b)
-    {
-        return $objSms4b->GetAdminPhones(SITE_ID);
-    }
-
-
     /** Как альтернатива есть функция SendSmsByTemplate - но там нужен будет цикл при отправке, потому что отправка по SendSms
-     *
-     * @param $objSms4b object - объект модуля sms4b, который уже создан в системе
-     * @param $arFields array - поля данных для СМС
-     * @param array $arAdminNumbers array - массив номеров админа, если от правка юзеру, то массив пустой, номер юзер уже есть в полях данных
+     * @param Csms4b $obSms4b
+     * @param array $arFields
+     * @param $templName
      * @return array
      */
-    public function getTextMessage(object $objSms4b, array $arFields, $templName)
+    public function getTextMessage(Csms4b $obSms4b, array $arFields, $templName)
     {
-//        if (empty($arAdminNumbers)) {
-//            $templName = '';
-//        } else {
-//            $templName = 'SMS4B_ADMIN_SALE_NEW_ORDER';
-//        }
-
-        $textMessage = $objSms4b->GetEventTemplate($templName, SITE_ID);
+        $textMessage = $obSms4b->GetEventTemplate($templName, SITE_ID);
 
         foreach ($arFields as $k => $value) {
             $textMessage['MESSAGE'] = str_replace('#' . $k . '#', $value, $textMessage['MESSAGE']);
@@ -169,14 +157,15 @@ class CustomizeSendSms
 
         $textMessage['MESSAGE'] = str_replace('#PHONE_TO#', $arFields['PHONE_TO'], $textMessage['MESSAGE']);
 
-        if ($objSms4b->use_translit === 'Y') {
-            $textMessage['MESSAGE'] = $objSms4b->Translit($textMessage['MESSAGE']);
+        if ($obSms4b->use_translit === 'Y') {
+            $textMessage['MESSAGE'] = $obSms4b->Translit($textMessage['MESSAGE']);
         }
+
         return $textMessage;
     }
 
     /**
-     * @return null|string - возвращает две большие латинские буквы от A до X, пример перерыв 23-01 Y-B
+     * @return null|string
      */
     public function getPeriod()
     {
@@ -187,50 +176,43 @@ class CustomizeSendSms
         }
         return $period;
     }
-
     /**
-     * Кастомизация данных отправляемых в СМС и времени отправки
-     * - объект события, передаваемый обработчиком битрикса
-     * @param Main\Event $objEvent object
      *
-     * @throws CheckIncludeModule() - проверка подключения модуля rarus.sms4b
-     * @throws CheckNewOrder() - проверка что заказ новый, а не обновление старого заказа
      *
-     * @return bool - результат
+     * @param Main\Event $obEvent
+     * @return bool
      */
-    public function sendCustomSMS(Main\Event $objEvent)
+    public function sendCustomSMS(Main\Event $obEvent)
     {
-
-        $objThis = new CustomizeSendSms($objEvent, $GLOBALS['SMS4B'], 19, 7);
-
         try {
-            $objThis->checkIncludeModule();
+            /** @var Csms4b $obSms4b */
+            $obSms4b = $this->obSms4b;
 
-            $arFields = $objThis->getFieldsSms($objEvent, $objThis->objSms4b);
+            if (!$obEvent->getParameter('IS_NEW'))
+            {
+                return false;
+            }
 
-            $objThis->checkNewOrder($objThis->objEvent);
+            $this->checkIncludeModule();
 
-            //$objThis->checkUserPhone($objThis->objSms4b, $arFields['PHONE_TO']);
+            $arFields = $this->getFieldsSms($obEvent, $obSms4b);
 
-            $arAdminNumbers = $objThis->getAdminNumbers($objThis->objSms4b);
+            $arFields['PHONE_TO'] = $this->validateUserPhone($obSms4b, $arFields['PHONE_TO']);
 
-            $UserTextMessage = $objThis->getTextMessage($objThis->objSms4b, $arFields, 'SMS4B_SALE_NEW_ORDER');
+            $arAdminNumbers = $obSms4b->GetAdminPhones(SITE_ID);
 
-            $AdminTextMessage = $objThis->getTextMessage($objThis->objSms4b, $arFields, 'SMS4B_SALE_NEW_ORDER_ADMIN');
+            $userTextMessage = $this->getTextMessage($obSms4b, $arFields, 'SMS4B_SALE_NEW_ORDER');
+
+            $adminTextMessage = $this->getTextMessage($obSms4b, $arFields, 'SMS4B_ADMIN_SALE_NEW_ORDER');
 
             foreach ($arAdminNumbers as $phoneNum) {
-                $arSendSms[$phoneNum] = $AdminTextMessage['MESSAGE'];
+                $arSendSms[$phoneNum] = $adminTextMessage['MESSAGE'];
             }
-            $arSendSms[$arFields['PHONE_TO']] = $UserTextMessage['MESSAGE'];
+            $arSendSms[$arFields['PHONE_TO']] = $userTextMessage['MESSAGE'];
 
-            $period = $objThis->getPeriod();
+            $period = $this->getPeriod();
 
-            // проверить отправку по периодам
-            AddMessage2Log('$period');
-            AddMessage2Log($period);
-
-            $objThis->objSms4b->SendSmsSaveGroup($arSendSms, null, null, null, $period, null, $arFields['ORDER_ID'],
-                'SALE_NEW_ORDER', 0);
+            $obSms4b->SendSmsSaveGroup($arSendSms, null, null, null, $period, null, $arFields['ORDER_ID'], 'SALE_NEW_ORDER', 0);
 
             return true;
         } catch (Exception $e) {
